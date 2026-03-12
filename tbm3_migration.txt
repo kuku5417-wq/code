@@ -18,7 +18,7 @@ Drive 폴더:
   sample/mssql/  ID: 1pfW8vCXMdOz-2zcmfif-FuHRSm6Zsdl5
     ptw_general.csv, ptw_zlng.csv, ptwlist.csv
     pjtlist.csv, project_milestone.csv
-    accident.csv, message.csv, accident_pdf/
+    accident.csv, message.csv, weather.csv, accident_pdf/
   sample/mysql/  ID: TODO (폴더 미생성)
     shipinfo.csv, pjtevent.csv
 
@@ -317,5 +317,20 @@ Step 6. 통합 테스트
   Drive/로컬 저장 파일명: pjtevent.csv (t 없음)
   → db.py 작성 시 Drive에서 읽을 때: "pjtevent.csv"
   → 사내망 전환 후 DB 쿼리 시: FROM pjtevemt
+
+[이슈 8] weather.csv — 사내망 전환 시 API 교체 필요
+  개발 환경: Open-Meteo (https://archive-api.open-meteo.com) — 무료, 키 불필요
+    위치: 울산 (lat=35.538, lon=129.311)
+    컬럼: temp_max, temp_min (°C) / rainfall (mm) / wind_speed (m/s, km/h÷3.6)
+    범위: 2026-01-01~03-11 (70행, generate_ptwdata.py fetch_weather() 함수)
+  사내망 전환 시 교체 권장: 기상청 기상자료개방포털 API
+    URL: https://apihub.kma.go.kr
+    인증키 발급 필요 (무료)
+    제공 데이터: 일별 최고/최저기온, 강수량, 최대풍속 (기상 관측소 기준)
+    관측소 코드: 울산 152번 (또는 거제 192번)
+  사내망 전환 후 db.py get_weather() 변경:
+    현재: weather.csv Drive 읽기
+    변경: 기상청 API 실시간 조회 → DB weather 테이블 또는 캐시 저장
+    또는: MSSQL weather 테이블 생성 후 배치 적재 (일 1회 API 호출)
 
 ================================================================================

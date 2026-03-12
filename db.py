@@ -23,7 +23,7 @@ MSSQL 전환 가이드 (TODO)
                  confined, start, finish, project, area, work_detail, work_type, ...)
   ptwlist       (source, status, category, team, department, manager,
                  confined, start, finish, project, area, work_detail, work_type)
-  weather       (date, day_of_week, day_type, temperature, rainfall, wind_speed)
+  weather       (date, day_of_week, day_type, temp_max, temp_min, rainfall, wind_speed)
   message       (date, team, content, ref_type, ref_path)
   accident      (id, date, summary, cause, result, countermeasure,
                  accident_type, work_keywords, source, pdf_filename)

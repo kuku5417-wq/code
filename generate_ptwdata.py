@@ -1,5 +1,7 @@
 import io
+import json
 import random
+import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -482,6 +484,67 @@ def get_drive_service():
     return build("drive", "v3", credentials=creds)
 
 
+def fetch_weather(start: str = "2026-01-01", end: str = "2026-03-11") -> pd.DataFrame:
+    """
+    Open-Meteo archive API로 실제 날씨 데이터 취득 (울산 기준).
+    https://archive-api.open-meteo.com
+    - temp_max  : 최고기온 (°C)
+    - temp_min  : 최저기온 (°C)
+    - rainfall  : 강수량 (mm)
+    - wind_speed: 최대풍속 (m/s, API km/h → /3.6 변환)
+    - day_of_week: 월~일
+    - day_type   : 공휴일/토요일/일요일/평일
+    """
+    # 울산 좌표 (현대중공업 기준)
+    LAT, LON = 35.538, 129.311
+    url = (
+        f"https://archive-api.open-meteo.com/v1/archive"
+        f"?latitude={LAT}&longitude={LON}"
+        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max"
+        f"&start_date={start}&end_date={end}"
+        f"&timezone=Asia%2FSeoul"
+    )
+    with urllib.request.urlopen(url, timeout=15) as resp:
+        data = json.loads(resp.read())
+
+    daily = data["daily"]
+    rows = []
+    # 2026년 한국 공휴일 (1/1~3/11 범위)
+    HOLIDAYS = {
+        "2026-01-01",               # 신정
+        "2026-02-16",               # 설날 전날
+        "2026-02-17",               # 설날
+        "2026-02-18",               # 설날 다음날
+        "2026-03-01",               # 삼일절 (일요일)
+        "2026-03-02",               # 삼일절 대체공휴일
+    }
+    DOW_KR = ["월", "화", "수", "목", "금", "토", "일"]
+
+    for i, d in enumerate(daily["time"]):
+        dt = datetime.strptime(d, "%Y-%m-%d")
+        dow = DOW_KR[dt.weekday()]
+        if d in HOLIDAYS:
+            day_type = "공휴일"
+        elif dt.weekday() == 5:
+            day_type = "토요일"
+        elif dt.weekday() == 6:
+            day_type = "일요일"
+        else:
+            day_type = "평일"
+
+        wind_kmh = daily["wind_speed_10m_max"][i] or 0.0
+        rows.append({
+            "date":        d,
+            "day_of_week": dow,
+            "day_type":    day_type,
+            "temp_max":    daily["temperature_2m_max"][i],
+            "temp_min":    daily["temperature_2m_min"][i],
+            "rainfall":    daily["precipitation_sum"][i] or 0.0,
+            "wind_speed":  round(wind_kmh / 3.6, 1),
+        })
+    return pd.DataFrame(rows)
+
+
 def upload_csv(svc, df: pd.DataFrame, filename: str, folder_id: str):
     res = svc.files().list(
         q=f"name='{filename}' and '{folder_id}' in parents and trashed=false",
@@ -505,6 +568,7 @@ def upload_csv(svc, df: pd.DataFrame, filename: str, folder_id: str):
 # ── 로컬 CSV 저장 (Drive 업로드 전 백업) ──────────────────────────────────────
 out_dir = Path(__file__).parent / "output"
 out_dir.mkdir(exist_ok=True)
+weather_df = fetch_weather("2026-01-01", "2026-03-11")
 general_df.to_csv(out_dir / "ptw_general.csv",          index=False, encoding="utf-8-sig")
 zlng_df.to_csv(out_dir / "ptw_zlng.csv",               index=False, encoding="utf-8-sig")
 ptwlist_df.to_csv(out_dir / "ptwlist.csv",             index=False, encoding="utf-8-sig")
@@ -512,6 +576,7 @@ pjtlist_df.to_csv(out_dir / "pjtlist.csv",             index=False, encoding="ut
 shipinfo_df.to_csv(out_dir / "shipinfo.csv",           index=False, encoding="utf-8-sig")
 pjtevemt_df.to_csv(out_dir / "pjtevent.csv",           index=False, encoding="utf-8-sig")
 milestone_df.to_csv(out_dir / "project_milestone.csv", index=False, encoding="utf-8-sig")
+weather_df.to_csv(out_dir / "weather.csv",             index=False, encoding="utf-8-sig")
 print("[OK] 로컬 저장 완료: GitHub/tbm3/output/")
 
 # ── Drive 업로드 ───────────────────────────────────────────────────────────────
@@ -527,6 +592,7 @@ try:
     # MySQL 가공 + 앱용 파생 → sample/mssql
     upload_csv(svc, pjtlist_df,   "pjtlist.csv",            MSSQL_FOLDER_ID)
     upload_csv(svc, milestone_df, "project_milestone.csv",  MSSQL_FOLDER_ID)
+    upload_csv(svc, weather_df,   "weather.csv",             MSSQL_FOLDER_ID)
     print(f"\n[OK] Drive 업로드 완료!")
 except Exception as e:
     print(f"\n[WARN] Drive 업로드 실패: {e}")
@@ -539,3 +605,4 @@ print(f"  pjtlist          : {len(pjtlist_df)}행")
 print(f"  shipinfo         : {len(shipinfo_df)}행")
 print(f"  pjtevemt         : {len(pjtevemt_df)}행")
 print(f"  project_milestone: {len(milestone_df)}행")
+print(f"  weather          : {len(weather_df)}행 (2026-01-01~03-11, 울산 실측)")

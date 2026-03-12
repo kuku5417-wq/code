@@ -204,17 +204,19 @@ if menu == "📋 TBM 스크립트 생성":
     def render_weather(weather, leader_name, leader_role, section_cls="section-title"):
         risks = []
         if weather:
-            t = weather.get("temperature", 0)
-            r = weather.get("rainfall", 0)
-            w = weather.get("wind_speed", 0)
-            if t <= 0:  risks.append(f"기온 {t}°C — 블랙아이스·동파 주의")
-            if r >= 30: risks.append(f"강수량 {r}mm — 침수·미끄럼 주의")
-            if w >= 15: risks.append(f"풍속 {w}m/s — 강풍, 외부 고소작업 제한")
-            if t >= 30: risks.append(f"기온 {t}°C — 혹서기 온열질환 주의")
-            if not risks: risks.append("특이 기상 위험요소 없음")
+            t_max = weather.get("temp_max", 0)
+            t_min = weather.get("temp_min", 0)
+            r     = weather.get("rainfall", 0)
+            w     = weather.get("wind_speed", 0)
+            if t_min <= 0:  risks.append(f"최저기온 {t_min}°C — 블랙아이스·동파 주의")
+            if r >= 30:     risks.append(f"강수량 {r}mm — 침수·미끄럼 주의")
+            if w >= 15:     risks.append(f"풍속 {w}m/s — 강풍, 외부 고소작업 제한")
+            if t_max >= 30: risks.append(f"최고기온 {t_max}°C — 혹서기 온열질환 주의")
+            if not risks:   risks.append("특이 기상 위험요소 없음")
         st.markdown(f'<div class="{section_cls}">② 날씨 위험요소</div>', unsafe_allow_html=True)
         if weather:
-            badges = (f'<span class="weather-badge">🌡 {weather.get("temperature","?")}°C</span>'
+            badges = (f'<span class="weather-badge">🌡 최고 {weather.get("temp_max","?")}°C</span>'
+                      f'<span class="weather-badge">🌡 최저 {weather.get("temp_min","?")}°C</span>'
                       f'<span class="weather-badge">💧 {weather.get("rainfall","?")}mm</span>'
                       f'<span class="weather-badge">💨 {weather.get("wind_speed","?")}m/s</span>')
             st.markdown(f'<div style="margin-bottom:0.8rem;">{badges}</div>', unsafe_allow_html=True)

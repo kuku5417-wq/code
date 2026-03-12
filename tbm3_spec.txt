@@ -57,6 +57,7 @@ GitHub/tbm3/
   │                 (130행) │                              │ 이벤트별 행으로 정규화 (앱용)            │
   │ accident.csv            │ generate_accident_data.py    │ 앱 생성 (더미 생성 예정)                 │
   │ message.csv             │ 앱 입력                      │ 앱 생성/수정 — 팀장전달사항              │
+  │ weather.csv      (70행) │ Open-Meteo API (울산)        │ 실측값 취득 — 범위: 2026-01-01~03-11    │
   │ accident_pdf/           │ generate_accident_data.py    │ 사고사례 PDF (accident_{id}.pdf)         │
   └─────────────────────────┴──────────────────────────────┴──────────────────────────────────────────┘
 
@@ -105,6 +106,26 @@ GitHub/tbm3/
   date (날짜), team (팀), content (전달사항 내용),
   ref_type (참고자료 유형: pdf/image/video/link/없음),
   ref_path (Drive 파일 ID 또는 URL)
+
+[4-5-1] weather.csv 컬럼 (7개) — Open-Meteo API 실측 + 계산
+  date        : 날짜 (YYYY-MM-DD)
+  day_of_week : 요일 (월~일, 계산)
+  day_type    : 평일/토요일/일요일/공휴일 (계산, 한국 공휴일 하드코딩)
+  temp_max    : 최고기온 °C  ← API 취득 (temperature_2m_max)
+  temp_min    : 최저기온 °C  ← API 취득 (temperature_2m_min)
+  rainfall    : 강수량 mm    ← API 취득 (precipitation_sum)
+  wind_speed  : 최대풍속 m/s ← API 취득 (wind_speed_10m_max ÷ 3.6)
+
+  위험 판단 기준 (tbm3_app.py render_weather):
+    temp_min ≤ 0    → "블랙아이스·동파 주의"
+    rainfall ≥ 30   → "침수·미끄럼 주의"
+    wind_speed ≥ 15 → "강풍, 외부 고소작업 제한"
+    temp_max ≥ 30   → "혹서기 온열질환 주의"
+
+  API: https://archive-api.open-meteo.com/v1/archive
+  좌표: 울산 (lat=35.538, lon=129.311) — 사내망 전환 시 기상청 API로 교체 권장
+  ※ 사내망 전환 시: 기상청 기상자료개방포털 API 사용 (인증키 필요)
+      https://apihub.kma.go.kr — 일별 기온/강수/풍속 제공
 
 [4-6] shipinfo.csv 컬럼 (27개) — MySQL shipinfo 전체 컬럼
   SHIPNUM      : 선박번호 (varchar 20, NOT NULL)
@@ -209,7 +230,7 @@ GitHub/tbm3/
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ① 건강상태 확인
-② 날씨 위험요소 (날씨 API 또는 더미 데이터)
+② 날씨 위험요소 (weather.csv — Open-Meteo API 실측, 최고/최저기온·강수량·풍속)
 ③ 팀장 전달사항 (message.csv, 참고자료 있으면 링크/미리보기 표시)
 ④ 작업허가 내용 및 위험요소 (ptwlist 기반, source 구분)
    - ptw_general: 일반 허가서 카드

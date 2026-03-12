@@ -183,50 +183,55 @@ def get_weather(target_date: str) -> dict:
 # ── 팀장전달사항 ──────────────────────────────────────────────────────────────
 
 def get_message(target_date: str, team: str) -> dict:
-    """팀장 전달사항 조회 — MSSQL tbm_message"""
+    """팀장 전달사항 조회 — MSSQL message
+    content 우선, 없으면 message 컬럼 폴백 (구버전 호환)
+    """
     df = _mssql_df(
-        "SELECT TOP 1 content, ref_type, ref_path FROM tbm_message "
-        "WHERE msg_date = ? AND team = ? ORDER BY id DESC",
+        "SELECT TOP 1 message, content, ref_type, ref_path FROM message "
+        "WHERE [date] = ? AND team = ? ORDER BY row_id DESC",
         params=[target_date, team],
     )
     if df.empty:
         return {}
     r = df.iloc[0]
+    content_val = str(r.get("content", "") or "").strip()
+    if not content_val:
+        content_val = str(r.get("message", "") or "").strip()
     return {
-        "content":  str(r.get("content",  "") or "").strip(),
+        "content":  content_val,
         "ref_type": str(r.get("ref_type", "") or ""),
         "ref_path": str(r.get("ref_path", "") or ""),
     }
 
 
 def get_messages_by_team(team: str, limit: int = 30) -> pd.DataFrame:
-    """팀별 전달사항 목록 조회 (메뉴 2) — MSSQL tbm_message"""
+    """팀별 전달사항 목록 조회 (메뉴 2) — MSSQL message"""
     return _mssql_df(
-        f"SELECT TOP ({limit}) msg_date AS [date], team, content, ref_type, ref_path "
-        "FROM tbm_message WHERE team = ? ORDER BY msg_date DESC",
+        f"SELECT TOP ({limit}) [date], team, message, content, ref_type, ref_path "
+        "FROM message WHERE team = ? ORDER BY [date] DESC",
         params=[team],
     )
 
 
 def save_message(date_str: str, team: str, content: str,
                  ref_type: str = "", ref_path: str = ""):
-    """팀장 전달사항 저장 — MSSQL tbm_message INSERT/UPDATE"""
+    """팀장 전달사항 저장 — MSSQL message INSERT/UPDATE (content 컬럼 사용)"""
     conn = _mssql_conn()
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT id FROM tbm_message WHERE msg_date = ? AND team = ?",
+            "SELECT row_id FROM message WHERE [date] = ? AND team = ?",
             [date_str, team],
         )
         if cur.fetchone():
             cur.execute(
-                "UPDATE tbm_message SET content=?, ref_type=?, ref_path=? "
-                "WHERE msg_date=? AND team=?",
+                "UPDATE message SET content=?, ref_type=?, ref_path=? "
+                "WHERE [date]=? AND team=?",
                 [content, ref_type, ref_path, date_str, team],
             )
         else:
             cur.execute(
-                "INSERT INTO tbm_message (msg_date, team, content, ref_type, ref_path) "
+                "INSERT INTO message ([date], team, content, ref_type, ref_path) "
                 "VALUES (?,?,?,?,?)",
                 [date_str, team, content, ref_type, ref_path],
             )
@@ -255,22 +260,22 @@ def upload_ref_file(file_bytes: bytes, filename: str, mimetype: str) -> str:
 # ── 사고사례 조회 ─────────────────────────────────────────────────────────────
 
 def get_accident_cases(work_type: str, limit: int = 2) -> pd.DataFrame:
-    """work_type 기준 유사 사고 사례 조회 — MSSQL tbm_accident"""
+    """work_type 기준 유사 사고 사례 조회 — MSSQL accident"""
     return _mssql_df(
-        f"SELECT TOP ({limit}) * FROM tbm_accident "
-        "WHERE work_keywords LIKE ? ORDER BY acc_date DESC",
+        f"SELECT TOP ({limit}) * FROM accident "
+        "WHERE work_keywords LIKE ? ORDER BY [date] DESC",
         params=[f"%{work_type}%"],
     )
 
 
 def get_all_accidents(work_type: str = None) -> pd.DataFrame:
-    """사고사례 전체 조회 (메뉴 3) — MSSQL tbm_accident"""
+    """사고사례 전체 조회 (메뉴 3) — MSSQL accident"""
     if work_type:
         return _mssql_df(
-            "SELECT * FROM tbm_accident WHERE work_keywords LIKE ? ORDER BY acc_date DESC",
+            "SELECT * FROM accident WHERE work_keywords LIKE ? ORDER BY [date] DESC",
             params=[f"%{work_type}%"],
         )
-    return _mssql_df("SELECT * FROM tbm_accident ORDER BY acc_date DESC")
+    return _mssql_df("SELECT * FROM accident ORDER BY [date] DESC")
 
 
 def get_accident_pdf_bytes(pdf_filename: str) -> bytes | None:
